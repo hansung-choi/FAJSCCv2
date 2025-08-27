@@ -1,6 +1,8 @@
 # FAJSCCv2
 
+![Image](https://github.com/user-attachments/assets/89ad7e46-c1dc-4f51-9ebe-6b9440226829)
 [dimension_specialized_operation.pdf](https://github.com/user-attachments/files/22002516/dimension_specialized_operation.pdf)
+
 
 Implementations of main experiments for the paper "Feature Importance-Aware Deep Joint Source-Channel Coding for Computationally Efficient and Adjustable Image Transmission" 
 This is an enhanced version compared to the previous FAJSCC (version 1 of arXiv) by applying axis dimension-specialized computation, selective deformable self-attention, and attention family tree frameworks detailed in the main paper.
