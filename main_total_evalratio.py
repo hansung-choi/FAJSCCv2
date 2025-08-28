@@ -37,7 +37,7 @@ def main(cfg: DictConfig):
     model_type_list_r1 = ["FAJSCCr1"]
     model_type_list_r2 = ["FAJSCCr2"]
     model_type_list_r12 = ["FAJSCCr12"]
-
+    model_name_list3 = [] #try with SwinJSCC or something else.
          
     
     rcpp_list=[12]
@@ -60,6 +60,7 @@ def main(cfg: DictConfig):
 if __name__ == '__main__':
     main()
     
+
 
 
 
