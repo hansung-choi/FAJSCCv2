@@ -43,7 +43,7 @@ def main(cfg: DictConfig):
     rcpp_list=[12]
     SNR_list=[1,10]
     
-    total_model_list = model_name_list_r12 + model_name_list_r1 + model_name_list_r2
+    total_model_list = model_name_list_r12 + model_name_list_r1 + model_name_list_r2 + model_name_list3
     
     
     total_eval_dict = get_total_eval_dict(cfg,logger,total_model_list,rcpp_list,SNR_list)
@@ -76,3 +76,4 @@ if __name__ == '__main__':
 
 
     
+
