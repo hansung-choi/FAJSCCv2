@@ -8,21 +8,21 @@ from torch_msssim import ssim_, ms_ssim_, SSIM_, MS_SSIM_
 
 def get_task_info(cfg):
 
-    if cfg.model_name == "ConvJSCC":
+    if cfg.model_name in ["ConvJSCC","largeConvJSCC","hugeConvJSCC"]:
         cfg.task_name = "ImageTransmission"
-    elif cfg.model_name == "ResJSCC":
+    elif cfg.model_name in ["ResJSCC","largeResJSCC","hugeResJSCC"]:
         cfg.task_name = "ImageTransmission"
-    elif cfg.model_name == "SwinJSCC":
+    elif cfg.model_name in ["SwinJSCC","largeSwinJSCC","smallSwinJSCC"]:
         cfg.task_name = "ImageTransmission"
-    elif cfg.model_name == "LICRFJSCC":
+    elif cfg.model_name in ["LICRFJSCC","largeLICRFJSCC","hugeLICRFJSCC"]:
         cfg.task_name = "ImageTransmission"
-
-        
-    elif cfg.model_name in ["FAJSCC","FAPGBJSCC","FAJSCCwoAT","FAJSCCwoLA","FAJSCCwoDf","LAFAJSCC","FALAJSCC"]:
+    elif cfg.model_name in ["LAJSCC","largeLAJSCC","smallLAJSCC"]:
+        cfg.task_name = "ImageTransmission"
+    elif cfg.model_name in ["FAJSCC","largeFAJSCC","smallFAJSCC"]:
         cfg.task_name = "FAIT"
-    elif cfg.model_name == "LAJSCC":
-        cfg.task_name = "ImageTransmission"
         
+    elif cfg.model_name in ["FAPGBJSCC","FAJSCCwoAT","FAJSCCwoLA","FAJSCCwoDf","LAFAJSCC","FALAJSCC"]:
+        cfg.task_name = "FAIT"        
 
     elif cfg.model_name == "FAJSCCr12_00" or cfg.model_name == "FAJSCCr12_02" or cfg.model_name == "FAJSCCr12_04" or cfg.model_name == "FAJSCCr12_05" or cfg.model_name == "FAJSCCr12_06" or cfg.model_name == "FAJSCCr12_08" or cfg.model_name == "FAJSCCr12_10":
         cfg.task_name = "FAIT"
@@ -235,6 +235,7 @@ class imagewiseSSIM(torch.nn.Module):
         image_wise_SSIM = unreduced_SSIM.reshape(-1).clone().detach().cpu()
 
         return image_wise_SSIM
+
 
 
 
