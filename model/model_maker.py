@@ -46,7 +46,32 @@ def get_model_info(cfg):
         model_info['decoder_n_feats_list'] = [40,60,80,160]
         model_info['ratio1'] = 0.7
 
-
+    elif cfg.model_name == "largeConvJSCC":
+        model_info['n_feats_list'] = [64,64,64,64]
+    elif cfg.model_name == "largeResJSCC":
+        model_info['n_feats_list'] = [64,64,64,64]
+    elif cfg.model_name == "largeLICRFJSCC":
+        model_info['n_feats_list'] = [64,96,128,180]
+    elif cfg.model_name == "hugeConvJSCC":
+        model_info['n_feats_list'] = [128,128,128,128]
+    elif cfg.model_name == "hugeResJSCC":
+        model_info['n_feats_list'] = [128,128,128,128]
+    elif cfg.model_name == "hugeLICRFJSCC":
+        model_info['n_feats_list'] = [80,120,160,240]    
+    
+        
+    elif cfg.model_name == "smallSwinJSCC":
+        model_info['n_feats_list'] = [28,42,64,120] 
+    elif cfg.model_name == "smallLAJSCC":
+        model_info['n_feats_list'] = [28,42,64,120] 
+    elif cfg.model_name == "smallFAJSCC":
+        model_info['n_feats_list'] = [28,42,64,200] 
+    elif cfg.model_name == "largeSwinJSCC":
+        model_info['n_feats_list'] = [60,90,120,200]
+    elif cfg.model_name == "largeLAJSCC":
+        model_info['n_feats_list'] = [60,90,120,200]
+    elif cfg.model_name == "largeFAJSCC":
+        model_info['n_feats_list'] = [60,90,120,360]
 
     elif cfg.model_name == "FAJSCCr12_00":
         model_info['n_feats_list'] = [40,60,80,260]
@@ -165,16 +190,17 @@ def ModelMaker(cfg):
     
     model_info = get_model_info(cfg)
 
-    if cfg.model_name == "ConvJSCC":
+    if cfg.model_name in ["ConvJSCC","largeConvJSCC","hugeConvJSCC"]:
         model = ConvJSCC(model_info)
-    elif cfg.model_name == "ResJSCC":
+    elif cfg.model_name in ["ResJSCC","largeResJSCC","hugeResJSCC"]:
         model = ResJSCC(model_info)
-    elif cfg.model_name == "SwinJSCC":
+    elif cfg.model_name in ["SwinJSCC","largeSwinJSCC","smallSwinJSCC"]:
         model = SwinJSCC(model_info)
-    elif cfg.model_name == "LICRFJSCC":
+    elif cfg.model_name in ["LICRFJSCC","largeLICRFJSCC","hugeLICRFJSCC"]:
         model = LICRFJSCC(model_info)
-    elif cfg.model_name == "FAJSCC":
+    elif cfg.model_name in ["FAJSCC","largeFAJSCC","smallFAJSCC"]:
         model = FAJSCC(model_info)
+
     elif cfg.model_name == "FAPGBJSCC":
         model = FAPGBJSCC(model_info)
     elif cfg.model_name == "FAJSCCwoAT":
@@ -204,4 +230,5 @@ def ModelMaker(cfg):
     return model
     
     
+
  
