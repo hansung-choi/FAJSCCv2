@@ -31,6 +31,12 @@ This is an enhanced version compared to the previous FAJSCC (version 1 of arXiv)
     python3 main_train.py rcpp=12 chan_type=AWGN performance_metric=PSNR SNR_info=4 model_name=ConvJSCC data_info=DIV2K
 
 
+### Example of experimental results for "Architecture Efficiency".
+**You can obtain test results for other settings by simply modifying arguments such as the SNR or rcpp values.**
+
+    python3 main_total_evalGM.py chan_type="AWGN" performance_metric="PSNR" data_info=DIV2K rcpp=32 SNR_info=10
+
+    
 ### Example of experimental results for "Main Results".
 **You can obtain test results for other settings by simply modifying the rcpp value, and models in the main_total_eval.py file**
 
