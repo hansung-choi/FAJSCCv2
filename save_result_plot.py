@@ -30,7 +30,7 @@ def get_model_save_name(cfg,model_name,rcpp,SNR):
     return save_name    
 
 
-def save_Mmemory_performance_plot_type(cfg,logger,total_eval_dict,model_name_list,model_type_list,rcpp,SNR):
+def save_Mmemory_performance_plot(cfg,logger,total_eval_dict,model_name_list,model_type_list,rcpp,SNR,prefix=None):
     save_folder = "../../test_results/"
     if not os.path.exists(save_folder):
         os.mkdir(save_folder)
@@ -42,14 +42,17 @@ def save_Mmemory_performance_plot_type(cfg,logger,total_eval_dict,model_name_lis
     
     for model_type in model_type_list:
         plot_save_name += "_" + model_type
+    if prefix:
+        plot_save_name = prefix + plot_save_name
 
     num_size = len(model_name_list)//len(model_type_list)
     th = 0
     m_type_index = 0
 
-    color_list = ['b-','r-','g-','c-','m-','b--','r--','g--','c--','m--']  
+    color_list = ['b-','r-','g-','c-','m-','b--','r--','g--','c--','m--']
+    color_list = ['b-','r-','g-','c-','m-','y-','k-','b--','r--','g--','c--','m--','y--','k--'] 
     
-    plt.rcParams["figure.figsize"] = (14,8)
+    plt.rcParams["figure.figsize"] = (20,8)
     
     fig, ax1 = plt.subplots()
     line_list = []
@@ -87,18 +90,21 @@ def save_Mmemory_performance_plot_type(cfg,logger,total_eval_dict,model_name_lis
     plt.yticks(fontsize=14)
 
     labels = [l.get_label() for l in lines]
-    ax1.legend(lines, labels, loc='upper left', bbox_to_anchor=(1.0, 1.0), fontsize=10)
+    ax1.legend(lines, labels, loc='upper left', bbox_to_anchor=(1.2, 1.0), fontsize=10)
     plt.tight_layout(rect=[0,0,0.6,0.8])
     plt.title(f'{cfg.chan_type}, CPP=1/{rcpp}, SNR={SNR}dB', fontdict = {'fontsize' : 20})
+    ax1.grid(True)
 
     save_name = save_folder + plot_save_name + ".pdf"
     if save_name:
         plt.savefig(save_name)
     plt.clf()
     logger.info(f'{plot_save_name} is saved')
+    
 
 
-def save_Mparams_performance_plot(cfg,logger,total_eval_dict,model_name_list,model_type_list,rcpp,SNR):
+
+def save_Mparams_performance_plot(cfg,logger,total_eval_dict,model_name_list,model_type_list,rcpp,SNR,prefix=None):
     save_folder = "../../test_results/"
     if not os.path.exists(save_folder):
         os.mkdir(save_folder)
@@ -110,14 +116,17 @@ def save_Mparams_performance_plot(cfg,logger,total_eval_dict,model_name_list,mod
     
     for model_type in model_type_list:
         plot_save_name += "_" + model_type
+    if prefix:
+        plot_save_name = prefix + plot_save_name
 
     num_size = len(model_name_list)//len(model_type_list)
     th = 0
     m_type_index = 0
 
-    color_list = ['b-','r-','g-','c-','m-','b--','r--','g--','c--','m--']  
+    color_list = ['b-','r-','g-','c-','m-','b--','r--','g--','c--','m--']
+    color_list = ['b-','r-','g-','c-','m-','y-','k-','b--','r--','g--','c--','m--','y--','k--'] 
     
-    plt.rcParams["figure.figsize"] = (14,8)
+    plt.rcParams["figure.figsize"] = (20,8)
     
     fig, ax1 = plt.subplots()
     line_list = []
@@ -155,9 +164,10 @@ def save_Mparams_performance_plot(cfg,logger,total_eval_dict,model_name_list,mod
     plt.yticks(fontsize=14)
 
     labels = [l.get_label() for l in lines]
-    ax1.legend(lines, labels, loc='upper left', bbox_to_anchor=(1.0, 1.0), fontsize=10)
+    ax1.legend(lines, labels, loc='upper left', bbox_to_anchor=(1.2, 1.0), fontsize=10)
     plt.tight_layout(rect=[0,0,0.6,0.8])
     plt.title(f'{cfg.chan_type}, CPP=1/{rcpp}, SNR={SNR}dB', fontdict = {'fontsize' : 20})
+    ax1.grid(True)
 
     save_name = save_folder + plot_save_name + ".pdf"
     if save_name:
@@ -166,7 +176,7 @@ def save_Mparams_performance_plot(cfg,logger,total_eval_dict,model_name_list,mod
     logger.info(f'{plot_save_name} is saved')
 
 
-def save_GFlops_performance_plot(cfg,logger,total_eval_dict,model_name_list,model_type_list,rcpp,SNR):
+def save_GFlops_performance_plot(cfg,logger,total_eval_dict,model_name_list,model_type_list,rcpp,SNR,prefix=None):
     save_folder = "../../test_results/"
     if not os.path.exists(save_folder):
         os.mkdir(save_folder)
@@ -178,14 +188,17 @@ def save_GFlops_performance_plot(cfg,logger,total_eval_dict,model_name_list,mode
     
     for model_type in model_type_list:
         plot_save_name += "_" + model_type
+    if prefix:
+        plot_save_name = prefix + plot_save_name
 
     num_size = len(model_name_list)//len(model_type_list)
     th = 0
     m_type_index = 0
 
-    color_list = ['b-','r-','g-','c-','m-','b--','r--','g--','c--','m--']  
+    color_list = ['b-','r-','g-','c-','m-','b--','r--','g--','c--','m--']
+    color_list = ['b-','r-','g-','c-','m-','y-','k-','b--','r--','g--','c--','m--','y--','k--']  
     
-    plt.rcParams["figure.figsize"] = (14,8)
+    plt.rcParams["figure.figsize"] = (20,8)
     
     fig, ax1 = plt.subplots()
     line_list = []
@@ -216,15 +229,16 @@ def save_GFlops_performance_plot(cfg,logger,total_eval_dict,model_name_list,mode
         lines += line
 
 
-    ax1.set_xlabel('GFlops', fontsize=20)
+    ax1.set_xlabel('GFLOPs', fontsize=20)
     ax1.set_ylabel(metric, fontsize=20)
     plt.xticks( fontsize=14)
     plt.yticks(fontsize=14)
 
     labels = [l.get_label() for l in lines]
-    ax1.legend(lines, labels, loc='upper left', bbox_to_anchor=(1.0, 1.0), fontsize=10)
+    ax1.legend(lines, labels, loc='upper left', bbox_to_anchor=(1.2, 1.0), fontsize=10)
     plt.tight_layout(rect=[0,0,0.6,0.8])
     plt.title(f'{cfg.chan_type}, CPP=1/{rcpp}, SNR={SNR}dB', fontdict = {'fontsize' : 20})
+    ax1.grid(True)
 
     save_name = save_folder + plot_save_name + ".pdf"
     if save_name:
@@ -382,7 +396,7 @@ def save_GFlops_performance_ratio_plot(cfg,logger,total_eval_dict,encoder_side_l
     
     
     
-def save_performance_GFlops_Mmemory_plot(cfg,logger,total_eval_dict,model_name_list,model_type_list,rcpp,SNR):
+def save_performance_GFlops_Mmemory_plot(cfg,logger,total_eval_dict,model_name_list,model_type_list,rcpp,SNR,prefix=None):
     save_folder = "../../test_results/"
     if not os.path.exists(save_folder):
         os.mkdir(save_folder)
@@ -394,12 +408,16 @@ def save_performance_GFlops_Mmemory_plot(cfg,logger,total_eval_dict,model_name_l
     
     for model_type in model_type_list:
         plot_save_name += "_" + model_type
+    if prefix:
+        plot_save_name = prefix + plot_save_name
 
     num_size = len(model_name_list)//len(model_type_list)
     th = 0
     m_type_index = 0
 
-    color_list = ['bo-','ro-','go-','co-','mo-','bo--','ro--','go--','co--','mo--']
+    color_list = ['bo-','ro-','go-','co-','mo-','yo-','ko-','bo--','ro--','go--','co--','mo--','yo--','ko--']
+    
+    #color_list = ['b-','r-','g-','c-','m-','y-','k-','b--','r--','g--','c--','m--','y--','k--']
     
     plt.rcParams["figure.figsize"] = (20,8) #(14,8)
     
@@ -440,7 +458,7 @@ def save_performance_GFlops_Mmemory_plot(cfg,logger,total_eval_dict,model_name_l
     th = 0
     m_type_index = 0
 
-    color_list = ['bd--','rd--','gd--','cd--','md--']
+    color_list = ['bd--','rd--','gd--','cd--','md--','yd--','kd--']
     
     
     ax2 = ax1.twiny() # ax1.twiny():use same y axis, ax1.twinx():use same x axis
