@@ -240,16 +240,22 @@ class Channel(nn.Module):
         return input_layer + noise
 
     def rayleigh_noise_layer(self, input_layer, std, name=None):
-        #print('Rayleigh')
         noise_real = torch.normal(mean=0.0, std=std, size=np.shape(input_layer))
         noise_imag = torch.normal(mean=0.0, std=std, size=np.shape(input_layer))
         noise = noise_real + 1j * noise_imag
-        h = torch.sqrt(torch.normal(mean=0.0, std=1, size=np.shape(input_layer)) ** 2
-                       + torch.normal(mean=0.0, std=1, size=np.shape(input_layer)) ** 2) / np.sqrt(2)
-                       
         noise = noise.to(input_layer.get_device())
+        
+        
+        h_real = torch.normal(mean=0.0, std=1.0, size=np.shape(input_layer))
+        h_imag = torch.normal(mean=0.0, std=1.0, size=np.shape(input_layer))
+        h = (h_real + 1j * h_imag) / np.sqrt(2)
         h = h.to(input_layer.get_device())
-        return input_layer * h + noise
+        
+        received_layer = input_layer * h + noise
+        sigma2 = std**2                                                                 #MMSE equalizer
+        equalized_layer = (torch.conj(h) / (torch.abs(h)**2 + sigma2)) * received_layer #MMSE equalizer
+        
+        return equalized_layer
  
 
     def complex_normalize(self, x): #imagewise normalize, attention when using masking operation (making return 1d tensor).
@@ -773,6 +779,7 @@ if __name__ == '__main__':
     print("Y:",Y)    
     print("y:",y)    
     
+
 
 
 
