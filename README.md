@@ -32,7 +32,7 @@ This is an enhanced version compared to the previous FAJSCC (version 1 of arXiv)
 
 ### Training HugeFAJSCC.
 
-    sh train_MG.sh
+    sh train_HugeFAJSCC.sh
 
 ### Example of experimental results for "Architecture Efficiency".
 **You can obtain test results for other settings by simply modifying arguments such as the SNR or rcpp values.**
