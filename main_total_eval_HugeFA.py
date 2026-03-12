@@ -35,29 +35,18 @@ def main(cfg: DictConfig):
     #cfg.test_data = "DIV2K"
     #cfg.test_data = "CLIC"
     data_info = DataMaker(cfg)     
-    for model_name_list in model_name_collection:
-        #total_eval_dict_list = get_total_eval_dict_list(cfg,logger,model_name_list,rcpp_list,SNR_list)
-
-        #save_SNR_performance_plot_meanstd(cfg, logger, total_eval_dict_list, model_name_list, rcpp, SNR_list,prefix=f'HugeFAJSCC_')
-
-        #save_SNR_performance_table_meanstd(cfg, logger, total_eval_dict_list, model_name_list, rcpp, SNR_list,prefix=f'HugeFAJSCC_')
-        
+    for model_name_list in model_name_collection:        
         total_eval_dict = get_total_eval_dict(cfg,logger,model_name_list,rcpp_list,SNR_list)
 
         save_CPP_performance_plot(cfg,logger,total_eval_dict,model_name_list,rcpp_list,SNR,prefix=f'HugeFA_')
         
         save_CPP_performance_table(cfg,logger,total_eval_dict,model_name_list,rcpp_list,SNR,prefix=f'HugeFA_')
-
-        #save_gflops_memory_table(cfg,logger,total_eval_dict,model_name_list,rcpp,SNR=10,prefix=f'HugeFA_')
-
-
-
-
         
         
 if __name__ == '__main__':
     main()
     
+
 
 
 
