@@ -26,7 +26,7 @@ for rcpp in 12 16 24 32; do
     --master_addr=$MASTER_ADDR \
     --master_port=$MASTER_PORT \
     main_train_DDP.py \
-    rcpp=${rcpp} chan_type=${chan_info1} SNR_info=${SNR_info4} model_name=$1 data_info=$2 performance_metric=$3
+    rcpp=${rcpp} chan_type=${chan_info1} SNR_info=${SNR_info4} model_name="HugeFAJSCC" data_info="Flickr30k" performance_metric="PSNR"
 done
 
 wait
