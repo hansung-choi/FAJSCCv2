@@ -18,7 +18,7 @@ def main(cfg: DictConfig):
     logger.info(f'device: {device}')
     
     hydra_cfg = hydra.core.hydra_config.HydraConfig.get()
-
+    cfg.test_data = "DIV2K"
     # set random seed number
     random_seed_num = cfg.random_seed
     torch.manual_seed(random_seed_num)

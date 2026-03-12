@@ -31,15 +31,14 @@ def main(cfg: DictConfig):
     print("cfg.data_info:",cfg.data_info)
     
     # make data_info
+    cfg.test_data = "Kodak"
     data_info = DataMaker(cfg)
 
     # make model
     model = ModelMaker(cfg)   # make model and set appropriate task name
 
     # make criterion
-    model.d = 4
-    d = model.d
-    criterion = LossMaker(cfg,d)
+    criterion = LossMaker(cfg)
     get_task_info(cfg)    
     
     
@@ -111,7 +110,7 @@ def main(cfg: DictConfig):
     #eval_model(cfg, logger, model, data_info.trainloader,data_info.testloader, criterion)
     
     # visualize task result
-    visualize_model(cfg, logger, model, data_info.trainloader,data_info.testloader,data_info.visualloader)
+    visualize_model(cfg, logger, model,data_info.testloader)
 
 
 

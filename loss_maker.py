@@ -5,24 +5,31 @@ from utils import *
 from einops import rearrange
 from torch_msssim import ssim_, ms_ssim_, SSIM_, MS_SSIM_
 
-
 def get_task_info(cfg):
 
-    if cfg.model_name in ["ConvJSCC","largeConvJSCC","hugeConvJSCC"]:
+    if cfg.model_name in ["ConvJSCC","ConvJSCCfixSNR04","ConvJSCCfixSNR07","largeConvJSCC","hugeConvJSCC"]:
         cfg.task_name = "ImageTransmission"
-    elif cfg.model_name in ["ResJSCC","largeResJSCC","hugeResJSCC"]:
+    elif cfg.model_name in ["ResJSCC","ResJSCCfixSNR04","ResJSCCfixSNR07","largeResJSCC","hugeResJSCC"]:
         cfg.task_name = "ImageTransmission"
-    elif cfg.model_name in ["SwinJSCC","largeSwinJSCC","smallSwinJSCC"]:
+    elif cfg.model_name in ["SwinJSCC","SwinJSCCfixSNR04","SwinJSCCfixSNR07","smallSwinJSCC","largeSwinJSCC"]:
         cfg.task_name = "ImageTransmission"
-    elif cfg.model_name in ["LICRFJSCC","largeLICRFJSCC","hugeLICRFJSCC"]:
+    elif cfg.model_name in ["LICRFJSCC","LICRFJSCCfixSNR04","LICRFJSCCfixSNR07","largeLICRFJSCC","hugeLICRFJSCC"]:
         cfg.task_name = "ImageTransmission"
-    elif cfg.model_name in ["LAJSCC","largeLAJSCC","smallLAJSCC"]:
+    elif cfg.model_name in ["LAJSCC","LAJSCCfixSNR04","LAJSCCfixSNR07","smallLAJSCC","largeLAJSCC"]:    
         cfg.task_name = "ImageTransmission"
-    elif cfg.model_name in ["FAJSCC","largeFAJSCC","smallFAJSCC"]:
-        cfg.task_name = "FAIT"
         
-    elif cfg.model_name in ["FAPGBJSCC","FAJSCCwoAT","FAJSCCwoLA","FAJSCCwoDf","LAFAJSCC","FALAJSCC"]:
+    elif cfg.model_name in ["ConvJSCCrandomSNR","ResJSCCrandomSNR","SwinJSCCrandomSNR","LICRFJSCCrandomSNR","LAJSCCrandomSNR"]:
+        cfg.task_name = "ITrandomSNR"
+        
+    elif cfg.model_name in ["FAJSCC","FAJSCCfixSNR04","FAJSCCfixSNR07","HugeFAJSCC","smallFAJSCC","largeFAJSCC"]:
         cfg.task_name = "FAIT"        
+    elif cfg.model_name in ["FAPGBJSCC","FAJSCCwoAT","FAJSCCwoLA","FAJSCCwoDf","LAFAJSCC","FALAJSCC"]:
+        cfg.task_name = "FAIT"
+    elif cfg.model_name in ["FAPGBJSCC","FAJSCCwoAT","FAJSCCwoLA","FAJSCCwoDf","LAFAJSCC","FALAJSCC"]:
+        cfg.task_name = "FAIT"
+    elif cfg.model_name in ["FAJSCCrandomSNR"]:
+        cfg.task_name = "FAITrandomSNR"        
+        
 
     elif cfg.model_name == "FAJSCCr12_00" or cfg.model_name == "FAJSCCr12_02" or cfg.model_name == "FAJSCCr12_04" or cfg.model_name == "FAJSCCr12_05" or cfg.model_name == "FAJSCCr12_06" or cfg.model_name == "FAJSCCr12_08" or cfg.model_name == "FAJSCCr12_10":
         cfg.task_name = "FAIT"
@@ -30,8 +37,10 @@ def get_task_info(cfg):
         cfg.task_name = "FAIT"
     elif cfg.model_name == "FAJSCCr2_00" or cfg.model_name == "FAJSCCr2_02" or cfg.model_name == "FAJSCCr2_04" or cfg.model_name == "FAJSCCr2_05" or cfg.model_name == "FAJSCCr2_06" or cfg.model_name == "FAJSCCr2_08" or cfg.model_name == "FAJSCCr2_10":
         cfg.task_name = "FAIT"
-        
-        
+
+    elif cfg.model_name in ["FAJSCCs03","FAJSCCs06","FAJSCCs10"]:
+        cfg.task_name = "FAIT"
+                
     else:
         raise ValueError(f'task for {cfg.model_name} model is not implemented yet')
 
@@ -39,24 +48,28 @@ def get_loss_info(cfg):
     cfg.loss_name = None
     get_task_info(cfg)
     
-    if cfg.task_name == "ImageTransmission":
+    if cfg.task_name in ["ImageTransmission","ITrandomSNR"]:
         if cfg.performance_metric == "PSNR":
             cfg.loss_name = "IT_MSE"
         elif cfg.performance_metric == "SSIM":
             cfg.loss_name = "IT_SSIM"
+        elif cfg.performance_metric == "MS-SSIM":
+            cfg.loss_name = "IT_MS-SSIM"
         else:
             raise ValueError(f'loss function for {cfg.performance_metric} of {cfg.task_name} task is not implemented yet')   
-    elif cfg.task_name == "FAIT":
+    elif cfg.task_name in ["FAIT","FAITrandomSNR"]:
         if cfg.performance_metric == "PSNR":
             cfg.loss_name = "FAIT_MSE"
         elif cfg.performance_metric == "SSIM":
             cfg.loss_name = "FAIT_SSIM"
+        elif cfg.performance_metric == "MS-SSIM":
+            cfg.loss_name = "FAIT_MS-SSIM"
         else:
             raise ValueError(f'loss function for {cfg.performance_metric} of {cfg.task_name} task is not implemented yet')   
     else:
         raise ValueError(f'loss function for {cfg.task_name} task is not implemented yet')       
 
-def LossMaker(cfg,d=4): #cfg: DictConfig
+def LossMaker(cfg): #cfg: DictConfig
     get_loss_info(cfg)
     if cfg.loss_name == "IT_MSE":
         loss = IT_MSE()
@@ -66,6 +79,8 @@ def LossMaker(cfg,d=4): #cfg: DictConfig
         loss = FAIT_MSE()
     elif cfg.loss_name == "FAIT_SSIM":
         loss = FAIT_SSIM() 
+    elif cfg.loss_name in ["IT_MS-SSIM","FAIT_MS-SSIM"]:
+        loss = IT_MSSSIM() 
     else:
         raise ValueError(f'{cfg.loss_name} is not implemented yet')
     return loss
@@ -122,7 +137,29 @@ class IT_SSIM(torch.nn.Module):
     def get_performance_metric(self):
         return "SSIM"
 
+class IT_MSSSIM(torch.nn.Module):
+    def __init__(self):
+        super(IT_MSSSIM, self).__init__()
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = device
 
+    def forward(self, image_hat, image):
+    	# inputs => N x C x H x W
+        image_hat = image_hat.to(self.device)
+        image = image.to(self.device)
+        #image_dim = image.size()
+        
+      # [-1 1] to [0 1]
+        image_hat = (image_hat+1)/2
+        image = (image+1)/2
+
+        msssim = ms_ssim_(image_hat, image, data_range=1, size_average=True)
+        total_loss = 1-msssim
+
+        return total_loss, msssim.clone().detach().cpu()
+        
+    def get_performance_metric(self):
+        return "MS-SSIM"
 
 class FAIT_MSE(torch.nn.Module):
     def __init__(self, CA_ratio=0.5,gamma = 0.5):
@@ -187,9 +224,6 @@ class FAIT_SSIM(torch.nn.Module):
     def get_performance_metric(self):
         return "SSIM"
 
-
-
-
 class imagewisePSNR(torch.nn.Module):
     def __init__(self):
         super(imagewisePSNR, self).__init__()
@@ -214,7 +248,6 @@ class imagewisePSNR(torch.nn.Module):
         return image_wise_psnr
 
 
-
 class imagewiseSSIM(torch.nn.Module):
     def __init__(self):
         super(imagewiseSSIM, self).__init__()
@@ -235,7 +268,6 @@ class imagewiseSSIM(torch.nn.Module):
         image_wise_SSIM = unreduced_SSIM.reshape(-1).clone().detach().cpu()
 
         return image_wise_SSIM
-
 
 
 

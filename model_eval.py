@@ -11,24 +11,51 @@ from loss_maker import *
 import csv
 from fvcore.nn import FlopCountAnalysis, flop_count_table    
 import gc
-
-def cal_flops(cfg, logger, model): 
+    
+def cal_flops_and_memory(cfg, logger, model, H, W, n_warmup=5, n_test=10):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    H, W = cfg.input_resolution
-    H, W = 512,768  # resolution of Kodak image data
-    input_image = torch.rand(1,3,H,W).float()
-    input_image = input_image.to(device) 
-    model.to(device)    
+
+    logger.info(f'Input resolution: {H} x {W}')
+
+    input_image = torch.rand(1, 3, H, W).float().to(device)
+    model = model.to(device)
     model.eval()
+
+    if device.type == 'cuda':
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats(device)
+
     with torch.no_grad():
+        # ---------------- FLOPs ----------------
         flops = FlopCountAnalysis(model, input_image)
+        GFlops = flops.total() / 1e9
 
-    GFlops = flops.total()/10**9
-    logger.info(f'GFlops: {GFlops}')
+        # ---------------- Memory ----------------
+        _ = model(input_image)
 
-    return GFlops
+        if device.type == 'cuda':
+            max_memory = torch.cuda.max_memory_allocated(device) / (1024 ** 2)
+        else:
+            max_memory = 0.0
+
+    logger.info(f'GFlops: {GFlops:.4f}')
+    logger.info(f'Max GPU Memory: {max_memory:.2f} MB')
 
 
+    return GFlops, max_memory
+    
+def add_flops_and_max_memory(cfg, logger, evaluation_dictionary,model):
+    resolution_list = [(512,768),(1536,2048)]
+
+    for H, W in resolution_list:
+        GFlops, max_memory = cal_flops_and_memory(cfg, logger, model, H, W)
+
+        key = f"{H}x{W}"
+        evaluation_dictionary[f"GFlops_{key}"] = float(GFlops)
+        evaluation_dictionary[f"max_memory_MB_{key}"] = float(max_memory)
+
+    return evaluation_dictionary    
+        
 def to_MB(a):
     return a/1024.0/1024.0
 
@@ -57,15 +84,13 @@ def get_n_model_params(cfg, logger, model):
 
 
 
-def eval_model(cfg: DictConfig, logger, model, trainloader,testloader, criterion):
+def eval_model(cfg: DictConfig, logger, model,testloader, criterion):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     since = time.time()
     evaluater = ModelEvaluater(cfg)
 
-    evaluation_dictionary = evaluater.one_epoch_eval(cfg, logger, model, trainloader, testloader, criterion)
-    GFlops = cal_flops(cfg, logger, model)
-    evaluation_dictionary['GFlops'] = GFlops
+    evaluation_dictionary = evaluater.one_epoch_eval(cfg, logger, model, testloader, criterion)
 
     save_model_evaluation_result_plot(cfg,evaluation_dictionary)
     
@@ -83,17 +108,18 @@ class ModelEvaluater():
         self.device = device
         self.task = cfg.task_name
 
-    def one_epoch_eval(self,cfg, logger, model, trainloader, testloader, criterion):
+    def one_epoch_eval(self,cfg, logger, model, testloader, criterion):
         evaluation_dictionary = {}
-        if self.task == "ImageTransmission" or self.task == "FAIT":
-            evaluation_dictionary = self.eval_task(cfg, logger, model, trainloader, testloader, criterion)
+        #if self.task == "ImageTransmission" or self.task == "FAIT":
+        if True:
+            evaluation_dictionary = self.eval_task(cfg, logger, model, testloader, criterion)
         else:
-            raise ValueError(f'{self.task} task train is not implemented yet')
+            raise ValueError(f'{self.task} task is not implemented yet')
         return evaluation_dictionary
     
 
 
-    def eval_task(self,cfg: DictConfig, logger, model, trainloader, testloader, criterion):
+    def eval_task(self,cfg: DictConfig, logger, model, testloader, criterion):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model.eval()
         evaluation_dictionary = {}
@@ -104,14 +130,25 @@ class ModelEvaluater():
         performance_metric = cfg.performance_metric
 
         count = 0           
-        
+        total_forward_time = 0.0
+                
         for i in range(1):
             for images, labels in testloader:
 
                 count += images.shape[0]
                 images = images.to(device)
                 with torch.no_grad():
+                
+                    if device.type == "cuda":
+                        torch.cuda.synchronize()
+                    start_time = time.time()
+                                        
                     images_hat = model(images, SNR_info=cfg.SNR_info)
+                    
+                    if device.type == "cuda":
+                        torch.cuda.synchronize()
+                    end_time = time.time()
+                    total_forward_time += (end_time - start_time)                    
                 total_loss = 0.
 
                 total_loss, performance = criterion(images_hat, images)
@@ -124,13 +161,16 @@ class ModelEvaluater():
                 
         test_epoch_total_loss = test_epoch_total_loss / count
         test_epoch_performance = test_epoch_performance / count
-
+        avg_ms_per_image = (total_forward_time / count) * 1000.0
+        
         logger.info(f'Test count per epoch: {count}')
         logger.info(f'Test loss: {test_epoch_total_loss}')
         logger.info(f'{performance_metric}: {test_epoch_performance}')   
-
+        logger.info(f'Forward time: {avg_ms_per_image:.4f} ms/image')
+        
         evaluation_dictionary[performance_metric] = test_epoch_performance
-
+        evaluation_dictionary['ms/image'] = avg_ms_per_image
+        
         return evaluation_dictionary
 
 
@@ -156,7 +196,7 @@ def save_IT_model_evaluation_result_plot(cfg,evaluation_dictionary,save_name):
     return None
 
 
-def visualize_model(cfg: DictConfig, logger, model, trainloader,testloader,visualloader):
+def visualize_model(cfg: DictConfig, logger, model,testloader):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     since = time.time()
@@ -169,7 +209,7 @@ def visualize_model(cfg: DictConfig, logger, model, trainloader,testloader,visua
     index = 1
     max_index = max_count    
     
-    for images, labels in visualloader:
+    for images, labels in testloader:
         print('visualization start')
         visualizer.visualize_model_inference(cfg,logger, model, images, test_SNR_info,count)
         print('visualization end')

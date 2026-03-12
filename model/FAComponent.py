@@ -138,10 +138,11 @@ def batch_index_fill(x, x1, x2, idx1, idx2):
 #need to implement get_spatial_mask method.
 class AttentionTree(nn.Module):
     """ Tree structured attention family predictor """
-    def __init__(self, dim, window_size=8, k=4, ratio=0.5):
+    def __init__(self, dim, window_size=8, k=4, ratio=0.5, swap=0.0):
         super().__init__()
         self.ratio = ratio
         self.window_size = window_size
+        self.swap = swap
         cdim = dim + k
         embed_dim = window_size ** 2
         mid_dim = cdim // 4
@@ -198,7 +199,26 @@ class AttentionTree(nn.Module):
             nn.Linear(window_size, 2),
             nn.Softmax(dim=-1)
         )
+    def swap_indices_between_sets(self, idx1, idx2):
+        if self.swap <= 0:
+            return idx1, idx2
 
+        if idx1.shape[1] == 0 or idx2.shape[1] == 0:
+            return idx1, idx2
+
+        num_swap = int(min(idx1.shape[1], idx2.shape[1]) * self.swap)
+        if num_swap <= 0:
+            return idx1, idx2
+
+        idx1_new = idx1.clone()
+        idx2_new = idx2.clone()
+
+        # Swap boundary elements for each sample independently
+        idx1_new[:, -num_swap:] = idx2[:, :num_swap]
+        idx2_new[:, :num_swap] = idx1[:, -num_swap:]
+
+        return idx1_new, idx2_new
+        
     def forward(self, input_x, mask=None, ratio=0.5, train_mode=False):
         x_root = self.backbone(input_x)
 
@@ -236,11 +256,12 @@ class AttentionTree(nn.Module):
             idx = torch.argsort(score, dim=1, descending=True)
             idx1 = idx[:, :num_keep_node]
             idx2 = idx[:, num_keep_node:]
+            idx1, idx2 = self.swap_indices_between_sets(idx1, idx2)
             return [idx1, idx2], offsets, ca, sa
 
 #need to implement get_spatial_mask method.
 class FAmixer(nn.Module):
-    def __init__(self, dim, window_size=8, bias=True, is_deformable=True, ratio=0.5):
+    def __init__(self, dim, window_size=8, bias=True, is_deformable=True, ratio=0.5,swap=0.0):
         super().__init__()    
 
         self.dim = dim
@@ -263,7 +284,7 @@ class FAmixer(nn.Module):
 
         self.act = nn.GELU()
         # Predictor
-        self.route = AttentionTree(dim,window_size,ratio=ratio)
+        self.route = AttentionTree(dim,window_size,ratio=ratio, swap=swap)
 
     def forward(self,x,condition_global=None, mask=None, train_mode=False):
         N,C,H,W = x.shape
@@ -355,12 +376,12 @@ class GatedFeedForward(nn.Module):
 
 
 class FABlock(nn.Module):
-    def __init__(self, n_feats, window_size=8, ratio=0.5):
+    def __init__(self, n_feats, window_size=8, ratio=0.5, swap=0.0):
         super(FABlock,self).__init__()
         
         self.n_feats = n_feats
         self.norm1 = LayerNorm(n_feats)
-        self.mixer = FAmixer(n_feats,window_size=window_size,ratio=ratio)
+        self.mixer = FAmixer(n_feats,window_size=window_size,ratio=ratio, swap=swap)
         self.norm2 = LayerNorm(n_feats)
         self.ffn = GatedFeedForward(n_feats)
         
@@ -382,9 +403,9 @@ class FABlock(nn.Module):
     
 
 class FAGroup(nn.Module):
-    def __init__(self, n_feats, n_block, window_size=8, ratio=0.5):
+    def __init__(self, n_feats, n_block, window_size=8, ratio=0.5, swap=0.0):
         super(FAGroup, self).__init__()
-        
+        self.swap = swap
         self.n_feats = n_feats
         self.n_block = n_block
         self.global_predictor = nn.Sequential(nn.Conv2d(n_feats, 8, 1, 1, 0, bias=True),
@@ -392,7 +413,7 @@ class FAGroup(nn.Module):
                                         nn.Conv2d(8, 2, 3, 1, 1, bias=True),
                                         nn.LeakyReLU(negative_slope=0.1, inplace=True))
 
-        self.body = nn.ModuleList([FABlock(n_feats, window_size=window_size, ratio=ratio) for i in range(n_block)])
+        self.body = nn.ModuleList([FABlock(n_feats, window_size=window_size, ratio=ratio, swap=self.swap) for i in range(n_block)])
         self.body_tail = nn.Conv2d(n_feats, n_feats, 1, 1, 0)
         
     def forward(self,x):

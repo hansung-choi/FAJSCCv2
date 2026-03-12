@@ -154,6 +154,7 @@ class FADecoder(nn.Module):
         n_block_list = model_info['n_block_list']
         window_size_list = model_info['window_size_list']
         ratio = model_info['ratio2']
+        self.swap = model_info['swap']
         self.ratio = ratio
         n_stage = len(n_block_list)
         self.n_stage = n_stage
@@ -165,7 +166,7 @@ class FADecoder(nn.Module):
         self.head_list = nn.Conv2d(C,n_feats_list[-1], kernel_size=1, stride=1, padding=0)
         
         for i in range(n_stage):
-            group_layer = FAGroup(n_feats_list[-1-i],n_block_list[-1-i],window_size_list[-1-i],ratio)
+            group_layer = FAGroup(n_feats_list[-1-i],n_block_list[-1-i],window_size_list[-1-i],ratio,self.swap)
             self.group_layers.append(group_layer)
             
             if i==n_stage-1:
@@ -410,10 +411,50 @@ class LADecoder(nn.Module):
             out = self.group_layers[i](out)
             out = self.upsample_layers[i](out)
         return out
+
+
+class HugeFADecoder(nn.Module):
+    def __init__(self, model_info):
+        super(HugeFADecoder, self).__init__()
+        color_channel = model_info['color_channel']
+        n_feats_list = model_info['n_feats_list']
+        n_block_list = model_info['n_block_list']
+        window_size_list = model_info['window_size_list']
+        ratio = model_info['ratio2']
+        self.ratio = ratio
+        n_stage = len(n_block_list)
+        self.n_stage = n_stage
+        rcpp = model_info['rcpp'] #rcpp means reverse of channel per pixel
+        C = int(3*2*(2**n_stage)*(2**n_stage)*(1/rcpp))
+        self.group_layers = nn.ModuleList()
+        self.upsample_layers = nn.ModuleList()
         
+        self.head_list = ResidualBottleneckBlock(C,n_feats_list[-1])
+        
+        for i in range(n_stage):
+            group_layer = FAGroup(n_feats_list[-1-i],n_block_list[-1-i],window_size_list[-1-i],ratio)
+            self.group_layers.append(group_layer)
+            
+            if i==n_stage-1:
+                upsample_layer = PatchReverseMerging(dim=n_feats_list[-1-i],out_dim=color_channel)
+            else:
+                upsample_layer = PatchReverseMerging(dim=n_feats_list[-1-i],out_dim=n_feats_list[-2-i])
+            self.upsample_layers.append(upsample_layer)
 
-
-
-
-
+        
+    def forward(self, x):
+        decision = []
+        out = self.head_list(x)
+        
+        if self.training:
+            for i in range(self.n_stage):
+                out, mask = self.group_layers[i](out)
+                out = self.upsample_layers[i](out)
+                decision.extend(mask)
+            return out, decision        
+        else:
+            for i in range(self.n_stage):            
+                out = self.group_layers[i](out)
+                out = self.upsample_layers[i](out)
+            return out
 

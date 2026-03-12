@@ -1,0 +1,16 @@
+---
+data_name: "Kodak"
+batch_size: 1 #11,9,8,20,32
+num_workers: 1 #4
+num_classes: 1
+color_channel: 3
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+ 

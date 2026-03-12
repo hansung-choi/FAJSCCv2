@@ -10,7 +10,7 @@ hydra:
     dir: outputs/${output_save_name} #${now:%Y-%m-%d_%H-%M-%S}
 
 input_resolution: 0
-chan_type: 'AWGN' #'AWGN', 'Rayleigh', 'none'
+chan_type: 'AWGN' #'AWGN', 'Rayleigh', 'Rayleigh-Estimated', 'none'
 performance_metric: 'PSNR' #'PSNR', 'SSIM', 'MS-SSIM'
 model_name: "ConvJSCC"
 task_name: None
@@ -18,10 +18,14 @@ loss_name: 0 # MSE, CE, MSE_CE
 #model_capacity: 32
 SNR_info: 1 # 1,4,7,10, random
 rcpp: 12
-random_seed: 0
+random_seed: 0 #random_seed_list = [0,10,20,30,40]
 step_num: 2
 visualize_img_num: 2
 ratio: 0.5
 gamma: 0.5
 ratio1: 0.5
 ratio2: 0.5
+data_mode: "test" # train, test, visualization
+train_data: False
+test_data: aaaa
+visual_data: False

@@ -485,4 +485,82 @@ class FALAJSCC(nn.Module): # importance Aware JSCC
     def add_epoch(self,number=1):
         with torch.no_grad():
             self.epoch += number
+        return self.epoch
+
+class FNJSCC(nn.Module):
+    def __init__(self, model_info):
+        super(FNJSCC, self).__init__()
+        #self.epoch = 0
+        self.epoch = nn.Parameter(torch.zeros(1))
+        self.color_channel = model_info['color_channel']
+        n_block_list = model_info['n_block_list']
+        self.n_stage = len(n_block_list)
+        self.rcpp = model_info['rcpp'] #rcpp means reverse of channel per pixel
+        self.C = int(3*2*(2**self.n_stage)*(2**self.n_stage)*(1/self.rcpp))
+        self.cpp = 1/self.rcpp
+        self.chan_type = model_info['chan_type']
+
+        self.Encoder = FNEncoder(model_info)
+        self.channel = Channel(self.chan_type)
+        self.Decoder = FNDecoder(model_info)
+        
+    def forward(self, x, SNR_info=5):
+        # input shape = B X C X H X W
+
+        encoder_output = self.Encoder(x)        
+        decoder_input = self.channel(encoder_output,SNR_info)        
+        decoder_output = self.Decoder(decoder_input)
+
+        return decoder_output
+
+    def get_epoch(self):
+        return self.epoch
+    
+    def add_epoch(self,number=1):
+        with torch.no_grad():
+            self.epoch += number
+        return self.epoch
+
+
+class HugeFAJSCC(nn.Module): # importance Aware JSCC
+    def __init__(self, model_info):
+        super(HugeFAJSCC, self).__init__()
+        #self.epoch = 0
+        self.register_buffer("epoch", torch.zeros(1))
+        self.color_channel = model_info['color_channel']
+        n_block_list = model_info['n_block_list']
+        self.n_stage = len(n_block_list)
+        self.rcpp = model_info['rcpp'] #rcpp means reverse of channel per pixel
+        self.C = int(3*2*(2**self.n_stage)*(2**self.n_stage)*(1/self.rcpp))
+        self.cpp = 1/self.rcpp
+        self.chan_type = model_info['chan_type']
+
+        self.Encoder = HugeFAEncoder(model_info)
+        self.channel = Channel(self.chan_type)
+        self.Decoder = HugeFADecoder(model_info)
+        
+    def forward(self, x, SNR_info=5):
+        # input shape = B X C X H X W
+        decision = []
+
+        if self.training:
+            encoder_output, mask = self.Encoder(x)
+            decision.extend(mask)                    
+            decoder_input = self.channel(encoder_output,SNR_info)        
+            decoder_output, mask = self.Decoder(decoder_input)
+            decision.extend(mask)
+            return decoder_output, decision          
+
+        else:
+            encoder_output = self.Encoder(x)        
+            decoder_input = self.channel(encoder_output,SNR_info)        
+            decoder_output = self.Decoder(decoder_input)
+            return decoder_output
+
+    def get_epoch(self):
+        return self.epoch
+    
+    def add_epoch(self,number=1):
+        with torch.no_grad():
+            self.epoch += number
         return self.epoch           

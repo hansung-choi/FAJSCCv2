@@ -10,7 +10,6 @@ from .FAwoLAComponent import FAGroupwoLA
 from .FAwoDfComponent import FAGroupwoDf
 from .LAComponent import LAGroup
 
-
 class ConvEncoder(nn.Module):
     def __init__(self, model_info):
         super(ConvEncoder, self).__init__()
@@ -154,6 +153,7 @@ class FAEncoder(nn.Module):
         n_block_list = model_info['n_block_list']
         window_size_list = model_info['window_size_list']
         ratio = model_info['ratio1']
+        self.swap = model_info['swap']
         self.ratio = ratio
         n_stage = len(n_block_list)
         self.n_stage = n_stage
@@ -169,7 +169,7 @@ class FAEncoder(nn.Module):
                 downsample_layer = PatchMerging(dim=n_feats_list[i-1],out_dim=n_feats_list[i])
             self.downsample_layers.append(downsample_layer)
             
-            group_layer = FAGroup(n_feats_list[i],n_block_list[i],window_size_list[i],ratio)
+            group_layer = FAGroup(n_feats_list[i],n_block_list[i],window_size_list[i],ratio,self.swap)
             self.group_layers.append(group_layer)
             
         self.head_list = nn.Conv2d(n_feats_list[-1], C, kernel_size=1, stride=1, padding=0)
@@ -414,8 +414,49 @@ class LAEncoder(nn.Module):
         out = self.head_list(out)
         return out            
             
-
             
+class HugeFAEncoder(nn.Module):
+    def __init__(self, model_info):
+        super(HugeFAEncoder, self).__init__()
+        color_channel = model_info['color_channel']
+        n_feats_list = model_info['n_feats_list']
+        n_block_list = model_info['n_block_list']
+        window_size_list = model_info['window_size_list']
+        ratio = model_info['ratio1']
+        self.ratio = ratio
+        n_stage = len(n_block_list)
+        self.n_stage = n_stage
+        rcpp = model_info['rcpp'] #rcpp means reverse of channel per pixel
+        C = int(3*2*(2**n_stage)*(2**n_stage)*(1/rcpp))
+        self.downsample_layers = nn.ModuleList()
+        self.group_layers = nn.ModuleList()
+        
+        for i in range(n_stage):
+            if i==0:
+                downsample_layer = PatchEmbed(patch_size=2, in_chans=color_channel, embed_dim=n_feats_list[i])
+            else:
+                downsample_layer = PatchMerging(dim=n_feats_list[i-1],out_dim=n_feats_list[i])
+            self.downsample_layers.append(downsample_layer)
             
+            group_layer = FAGroup(n_feats_list[i],n_block_list[i],window_size_list[i],ratio)
+            self.group_layers.append(group_layer)
             
-            
+        self.head_list =  ResidualBottleneckBlock(n_feats_list[-1], C)
+        
+    def forward(self, x):
+        out = x
+        decision = []
+                
+        if self.training:
+            for i in range(self.n_stage):
+                out = self.downsample_layers[i](out)
+                out, mask  = self.group_layers[i](out)
+                decision.extend(mask)
+            out = self.head_list(out)
+            return out, decision
+        else:
+            for i in range(self.n_stage):
+                out = self.downsample_layers[i](out)
+                out = self.group_layers[i](out)
+            out = self.head_list(out)
+            return out            

@@ -240,6 +240,7 @@ class Channel(nn.Module):
         return input_layer + noise
 
     def rayleigh_noise_layer(self, input_layer, std, name=None):
+        #print('Rayleigh')
         noise_real = torch.normal(mean=0.0, std=std, size=np.shape(input_layer))
         noise_imag = torch.normal(mean=0.0, std=std, size=np.shape(input_layer))
         noise = noise_real + 1j * noise_imag
@@ -252,9 +253,47 @@ class Channel(nn.Module):
         h = h.to(input_layer.get_device())
         
         received_layer = input_layer * h + noise
+        #eps = 1e-3                                                                       #ZF equalizer
+        #equalized_layer = received_layer/ (h + eps)                                      #ZF equalizer
         sigma2 = std**2                                                                 #MMSE equalizer
         equalized_layer = (torch.conj(h) / (torch.abs(h)**2 + sigma2)) * received_layer #MMSE equalizer
         
+        return equalized_layer
+
+    def rayleigh_estimated_noise_layer(self, input_layer, std, name=None, sigma_e2=0.03):
+        """ #https://onlinelibrary.wiley.com/doi/full/10.4218/etrij.2022-0209
+        Fast Rayleigh fading with imperfect CSI at the receiver.
+
+        Channel:        y = h x + n,   h ~ CN(0,1)
+        CSI model:      h_hat = h + e, e ~ CN(0, sigma_e2), independent of h
+        Equalizer:      MMSE using h_hat:  x_hat = (h_hat^* / (|h_hat|^2 + sigma2)) y
+        """
+        device = input_layer.device
+
+        # AWGN: n ~ CN(0, sigma2)
+        noise_real = torch.normal(mean=0.0, std=std, size=input_layer.shape, device=device)
+        noise_imag = torch.normal(mean=0.0, std=std, size=input_layer.shape, device=device)
+        noise = noise_real + 1j * noise_imag
+
+        # Fast Rayleigh fading: h ~ CN(0,1)
+        h_real = torch.normal(mean=0.0, std=1.0, size=input_layer.shape, device=device)
+        h_imag = torch.normal(mean=0.0, std=1.0, size=input_layer.shape, device=device)
+        h = (h_real + 1j * h_imag) / np.sqrt(2)
+
+        # Received
+        received_layer = input_layer * h + noise
+
+        # Imperfect CSI: h_hat = h + e, e ~ CN(0, sigma_e2)
+        e_std = np.sqrt(sigma_e2 / 2.0)
+        e_real = torch.normal(mean=0.0, std=e_std, size=input_layer.shape, device=device)
+        e_imag = torch.normal(mean=0.0, std=e_std, size=input_layer.shape, device=device)
+        e = e_real + 1j * e_imag
+        h_hat = h + e
+
+        # MMSE equalizer using h_hat
+        sigma2 = std**2
+        equalized_layer = (torch.conj(h_hat) / (torch.abs(h_hat)**2 + sigma2)) * received_layer
+
         return equalized_layer
  
 
@@ -301,6 +340,13 @@ class Channel(nn.Module):
             chan_output = self.rayleigh_noise_layer(channel_tx,
                                                     std=sigma,
                                                     name="rayleigh_chan_noise")
+            return chan_output
+        elif self.chan_type == 3 or self.chan_type == 'Rayleigh-Estimated':
+            channel_tx = channel_in
+            sigma = np.sqrt(1.0 / (2 * 10 ** (chan_param / 10)))
+            chan_output = self.rayleigh_estimated_noise_layer(channel_tx,
+                                                    std=sigma,
+                                                    name="rayleigh_estimated_noise")
             return chan_output
 
 
@@ -766,6 +812,64 @@ class imagewisePSNR(torch.nn.Module):
         return image_wise_psnr
 
 
+def conv1x1(in_ch: int, out_ch: int, stride: int = 1):
+    """1x1 convolution."""
+    return nn.Conv2d(in_ch, out_ch, kernel_size=1, stride=stride)
+    
+    
+def conv3x3(in_ch: int, out_ch: int, stride: int = 1):
+    """3x3 convolution with padding."""
+    return nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=stride, padding=1)    
+
+class ResidualBottleneckBlock(nn.Module):
+    """Residual bottleneck block.
+
+    Introduced by [He2016], this block sandwiches a 3x3 convolution
+    between two 1x1 convolutions which reduce and then restore the
+    number of channels. This reduces the number of parameters required.
+
+    [He2016]: `"Deep Residual Learning for Image Recognition"
+    <https://arxiv.org/abs/1512.03385>`_, by Kaiming He, Xiangyu Zhang,
+    Shaoqing Ren, and Jian Sun, CVPR 2016.
+
+    Args:
+        in_ch (int): Number of input channels
+        out_ch (int): Number of output channels
+    """
+
+    def __init__(self, in_ch: int, out_ch: int):
+        super().__init__()
+        mid_ch = min(in_ch, out_ch) // 2
+        self.conv1 = conv1x1(in_ch, mid_ch)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.conv2 = conv3x3(mid_ch, mid_ch)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.conv3 = conv1x1(mid_ch, out_ch)
+        self.skip = conv1x1(in_ch, out_ch) if in_ch != out_ch else nn.Identity()
+
+    def forward(self, x):
+        identity = self.skip(x)
+
+        out = x
+        out = self.conv1(out)
+        out = self.relu1(out)
+        out = self.conv2(out)
+        out = self.relu2(out)
+        out = self.conv3(out)
+
+        return out + identity
+
+
+
+
+
+
+
+
+
+
+
+
 
 if __name__ == '__main__':
     x = [1.,2.,3.,4.]
@@ -779,7 +883,6 @@ if __name__ == '__main__':
     print("Y:",Y)    
     print("y:",y)    
     
-
 
 
 

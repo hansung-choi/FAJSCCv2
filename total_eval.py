@@ -9,7 +9,16 @@ import random
 import os
 import gc
 
-
+def get_total_eval_dict_list(cfg,logger,model_name_list,rcpp_list,SNR_list):
+    total_eval_dict_list = []
+    random_seed_list = [0,10,20,30,40]
+    logger.info(f'get_total_eval_dict_list for random_seed_list={random_seed_list}')
+    for seed in random_seed_list:
+        cfg.random_seed = seed
+        total_eval_dict = get_total_eval_dict(cfg,logger,model_name_list,rcpp_list,SNR_list)
+        total_eval_dict_list.append(total_eval_dict)
+    
+    return total_eval_dict_list
 
 def get_total_eval_dict(cfg,logger,model_name_list,rcpp_list,SNR_list):
     since = time.time()
@@ -26,7 +35,23 @@ def get_total_eval_dict(cfg,logger,model_name_list,rcpp_list,SNR_list):
     time_elapsed = time.time() - since
     logger.info(f'total result dict is made in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
 
-    return total_eval_dict  
+    return total_eval_dict
+
+def set_model_info(cfg,logger,model_name,rcpp,SNR):
+    data = cfg.data_info.data_name
+    cfg.model_name = model_name
+    get_loss_info(cfg)
+    get_task_info(cfg)
+    task = cfg.task_name
+    cfg.SNR_info = SNR
+    chan_type = cfg.chan_type
+    SNR = str(cfg.SNR_info).zfill(3)
+    cfg.rcpp = rcpp
+    rcpp = str(cfg.rcpp).zfill(3)
+    metric = cfg.performance_metric
+    random_seed_num = cfg.random_seed
+    random_num = str(random_seed_num).zfill(3)  
+
 
 def get_model_save_name(cfg,model_name,rcpp,SNR):
     data = cfg.data_info.data_name
@@ -42,10 +67,51 @@ def get_model_save_name(cfg,model_name,rcpp,SNR):
     metric = cfg.performance_metric
     random_seed_num = cfg.random_seed
     random_num = str(random_seed_num).zfill(3)
-      
+    
     save_name = f"{task}_{data}_{chan_type}_SNR{SNR}_rcpp{rcpp}_{metric}_{model_name}.pt"
 
-    return save_name    
+
+    return save_name
+
+def get_result_dict_name(cfg,logger,model_name,rcpp,SNR):
+    train_data = cfg.data_info.data_name
+    test_data = cfg.test_data
+    cfg.model_name = model_name
+    get_loss_info(cfg)
+    get_task_info(cfg)
+    task = cfg.task_name
+    cfg.SNR_info = SNR
+    chan_type = cfg.chan_type
+    SNR = str(cfg.SNR_info).zfill(3)
+    cfg.rcpp = rcpp
+    rcpp = str(cfg.rcpp).zfill(3)
+    metric = cfg.performance_metric
+    random_seed_num = cfg.random_seed
+    random_num = str(random_seed_num).zfill(3)  
+    
+    dict_name = f"{random_num}_{task}_{train_data}_{test_data}_{chan_type}_SNR{SNR}_rcpp{rcpp}_{metric}_{model_name}.pkl"
+
+    return dict_name    
+
+def load_result_dict(dict_name):
+    dict_folder = "../../result_dicts/"
+    dict_path = dict_folder + dict_name
+    if os.path.exists(dict_path):
+        with open(dict_path, "rb") as f:
+            loaded_dict = pickle.load(f)
+    else:
+        loaded_dict = None
+    
+    return loaded_dict 
+    
+def save_result_dict(result_dict, dict_name):
+    dict_folder = "../../result_dicts/"
+    os.makedirs(dict_folder, exist_ok=True) 
+    
+    dict_path = os.path.join(dict_folder, dict_name)
+
+    with open(dict_path, "wb") as f:
+        pickle.dump(result_dict, f, protocol=pickle.HIGHEST_PROTOCOL)
     
 def get_loaded_model(cfg,logger,model_name,rcpp,SNR):
     data = cfg.data_info.data_name
@@ -61,17 +127,64 @@ def get_loaded_model(cfg,logger,model_name,rcpp,SNR):
     metric = cfg.performance_metric
     random_seed_num = cfg.random_seed
     random_num = str(random_seed_num).zfill(3)
-
+    
     if cfg.model_name in ["FAJSCCr12_00","FAJSCCr12_02","FAJSCCr12_04","FAJSCCr12_05","FAJSCCr12_06","FAJSCCr12_08","FAJSCCr12_10"]:
         model_name = "FAJSCC"
     elif cfg.model_name in ["FAJSCCr1_00","FAJSCCr1_02","FAJSCCr1_04","FAJSCCr1_05","FAJSCCr1_06","FAJSCCr1_08","FAJSCCr1_10"]:
         model_name = "FAJSCC"
     elif cfg.model_name in ["FAJSCCr2_00","FAJSCCr2_02","FAJSCCr2_04","FAJSCCr2_05","FAJSCCr2_06","FAJSCCr2_08","FAJSCCr2_10"]:
         model_name = "FAJSCC"
-    
+        
+    elif cfg.model_name in ["ConvJSCCfixSNR04"]:
+        model_name = "ConvJSCC"
+        SNR = str(4).zfill(3)
+    elif cfg.model_name in ["ConvJSCCfixSNR07"]:
+        model_name = "ConvJSCC"
+        SNR = str(7).zfill(3)
+    elif cfg.model_name in ["ResJSCCfixSNR04"]:
+        model_name = "ResJSCC"
+        SNR = str(4).zfill(3)
+    elif cfg.model_name in ["ResJSCCfixSNR07"]:
+        model_name = "ResJSCC"
+        SNR = str(7).zfill(3)
+    elif cfg.model_name in ["SwinJSCCfixSNR04"]:
+        model_name = "SwinJSCC"
+        SNR = str(4).zfill(3)
+    elif cfg.model_name in ["SwinJSCCfixSNR07"]:
+        model_name = "SwinJSCC"
+        SNR = str(7).zfill(3)        
+    elif cfg.model_name in ["LICRFJSCCfixSNR04"]:
+        model_name = "LICRFJSCC"
+        SNR = str(4).zfill(3)
+    elif cfg.model_name in ["LICRFJSCCfixSNR07"]:
+        model_name = "LICRFJSCC"
+        SNR = str(7).zfill(3)
+    elif cfg.model_name in ["LAJSCCfixSNR04"]:
+        model_name = "LAJSCC"
+        SNR = str(4).zfill(3)
+    elif cfg.model_name in ["LAJSCCfixSNR07"]:
+        model_name = "LAJSCC"
+        SNR = str(7).zfill(3)
+    elif cfg.model_name in ["FAJSCCfixSNR04"]:
+        model_name = "FAJSCC"
+        SNR = str(4).zfill(3)
+    elif cfg.model_name in ["FAJSCCfixSNR07"]:
+        model_name = "FAJSCC"
+        SNR = str(7).zfill(3)
+    elif cfg.model_name in ["HugeFAJSCC"]:
+        data = "Flickr30k"    
+        metric = 'PSNR'
+        
+        
+        
+            
     save_dir = "../../saved_models/"    
-    save_name = f"{task}_{data}_{chan_type}_SNR{SNR}_rcpp{rcpp}_{metric}_{model_name}.pt"
-    save_name_backup = f"{task}_{data}_{chan_type}_SNR{SNR}_rcpp{rcpp}_{metric}_{model_name}_backup.pt"
+    save_name = f"{random_num}_{task}_{data}_{chan_type}_SNR{SNR}_rcpp{rcpp}_{metric}_{model_name}.pt"
+    save_name_backup = f"{random_num}_{task}_{data}_{chan_type}_SNR{SNR}_rcpp{rcpp}_{metric}_{model_name}_backup.pt"
+    
+    if model_name in ["ConvJSCCrandomSNR","ResJSCCrandomSNR","SwinJSCCrandomSNR","LICRFJSCCrandomSNR","LAJSCCrandomSNR","FAJSCCrandomSNR"]:
+        save_name = f"{random_num}_{task}_{data}_{chan_type}_rcpp{rcpp}_{metric}_{model_name}.pt"
+        save_name_backup = f"{random_num}_{task}_{data}_{chan_type}_rcpp{rcpp}_{metric}_{model_name}_backup.pt"
           
     model_info_save_path = save_dir + save_name
     model_backup_info_save_path = save_dir + save_name_backup
@@ -104,25 +217,18 @@ def get_loaded_model(cfg,logger,model_name,rcpp,SNR):
         torch.manual_seed(random_seed_num)
         np.random.seed(random_seed_num)
         random.seed(random_seed_num)
-    
-
-    # load and make model    
-    #model = ModelMaker(cfg)
-    #logger.info(f'load {save_name}')
-    #model.load_state_dict(torch.load(model_info_save_path))
 
     return model  
     
     
-def get_specific_model_result_dict(cfg: DictConfig, logger, model, trainloader,testloader, criterion):
+def get_specific_model_result_dict(cfg: DictConfig, logger, model,testloader, criterion):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     since = time.time()
     evaluater = ModelEvaluater(cfg)
 
-    evaluation_dictionary = evaluater.one_epoch_eval(cfg, logger, model, trainloader, testloader, criterion)
-    GFlops = cal_flops(cfg, logger, model)
-    evaluation_dictionary['GFlops'] = GFlops
+    evaluation_dictionary = evaluater.one_epoch_eval(cfg, logger, model, testloader, criterion)
+    evaluation_dictionary = add_flops_and_max_memory(cfg, logger, evaluation_dictionary,model)
     Mmemory = cal_MB(cfg, logger, model)
     evaluation_dictionary['Mmemory'] = Mmemory
     Mparams = get_n_model_params(cfg, logger, model)
@@ -146,6 +252,16 @@ def get_model_eval_dict(cfg,logger,model_name,rcpp,SNR):
     logger.info(f'---------------------------------------------------------------')
     evaluation_dictionary = None
     
+    set_model_info(cfg,logger,model_name,rcpp,SNR)
+    result_dict_name = get_result_dict_name(cfg,logger,model_name,rcpp,SNR)
+    result_dict = load_result_dict(result_dict_name)
+    if result_dict:
+        logger.info(f'result_dict {result_dict_name} is loaded')
+        logger.info(f'result_dict: {result_dict}')
+        #if model_name not in ["ConvJSCC"]:
+            #return result_dict
+        return result_dict
+    
     #load model
     model = get_loaded_model(cfg,logger,model_name,rcpp,SNR)
     
@@ -157,9 +273,17 @@ def get_model_eval_dict(cfg,logger,model_name,rcpp,SNR):
         # make criterion
         model.d = 4
         d = model.d
-        criterion = LossMaker(cfg,d)    
+        criterion = LossMaker(cfg)    
 
-        evaluation_dictionary = get_specific_model_result_dict(cfg, logger, model, data_info.trainloader,data_info.testloader, criterion)
+        random_seed_num = cfg.random_seed
+        torch.manual_seed(random_seed_num)
+        np.random.seed(random_seed_num)
+        random.seed(random_seed_num)
+
+        evaluation_dictionary = get_specific_model_result_dict(cfg, logger, model,data_info.testloader, criterion)
+
+        save_result_dict(evaluation_dictionary, result_dict_name)
+        logger.info(f'result_dict {result_dict_name} is saved')
 
     return evaluation_dictionary
 

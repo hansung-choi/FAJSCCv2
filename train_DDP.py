@@ -20,7 +20,7 @@ def save_loss_plot(total_loss_info_list,cfg, logger):
 
     lines = ax1.plot(epoch_list, total_loss_info_list[1],label="train loss")
 
-    plt.title(f"{cfg.model_name}")
+    plt.title(f"loss per epoch")
     ax1.set_xlabel(r'Epochs', fontsize=18)
     ax1.set_ylabel(f'{total_loss_info_list[0]}', fontsize=15)
     plt.xticks(fontsize=14)
@@ -67,22 +67,21 @@ def save_loss_plot(total_loss_info_list,cfg, logger):
     
     
 
-def train_model(cfg: DictConfig, logger, model, trainloader, criterion, optimizer, scheduler=None):
+def train_model(cfg: DictConfig, logger, model,data_info, criterion, optimizer, scheduler=None):
     num_epoch = cfg.train_epoch
+    use_ddp = "LOCAL_RANK" in os.environ  # torchrun sets this
+    is_main = (not use_ddp) or (dist.get_rank() == 0)
     total_max_epoch = cfg.total_max_epoch
-    saved_model_epoch = int(model.epoch.item())
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
+    base_model = model.module if use_ddp else model
+    saved_model_epoch = int(base_model.epoch.item())
     since = time.time()
     trainer = Trainer(cfg)
     
     # save information for loss curve
     total_loss_info_list = [cfg.loss_name]
     train_loss_list = []
-    test_loss_list = []
     
-    # save inforamtion for best performance model
-    best_train_loss = float('inf')    
+    # save inforamtion for best performance model   
     task = cfg.task_name
     data = cfg.data_info.data_name
     chan_type = cfg.chan_type
@@ -93,61 +92,52 @@ def train_model(cfg: DictConfig, logger, model, trainloader, criterion, optimize
     random_num = str(random_seed_num).zfill(3)
     model_name = cfg.model_name
     save_dir = "../../saved_models/" #"../../../saved_models/"
-    if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
-    save_name = f"{random_num}_{task}_{data}_{chan_type}_SNR{str(SNR).zfill(3)}_rcpp{rcpp}_{metric}_{model_name}.pt"    
-    save_name_backup = f"{random_num}_{task}_{data}_{chan_type}_SNR{str(SNR).zfill(3)}_rcpp{rcpp}_{metric}_{model_name}_backup.pt"
-    
+    os.makedirs(save_dir, exist_ok=True)
+
     if model_name in ["ConvJSCCrandomSNR","ResJSCCrandomSNR","SwinJSCCrandomSNR","LICRFJSCCrandomSNR","LAJSCCrandomSNR","FAJSCCrandomSNR"]:
         save_name = f"{random_num}_{task}_{data}_{chan_type}_rcpp{rcpp}_{metric}_{model_name}.pt"
         save_name_backup = f"{random_num}_{task}_{data}_{chan_type}_rcpp{rcpp}_{metric}_{model_name}_backup.pt"
+    else:
+        save_name = f"{random_num}_{task}_{data}_{chan_type}_SNR{str(SNR).zfill(3)}_rcpp{rcpp}_{metric}_{model_name}.pt"    
+        save_name_backup = f"{random_num}_{task}_{data}_{chan_type}_SNR{str(SNR).zfill(3)}_rcpp{rcpp}_{metric}_{model_name}_backup.pt"        
                 
     save_point = 0
 
 
-    criterion.current_epoch = model.epoch.item()
+    criterion.current_epoch = base_model.epoch.item()
         
     #logger.info(f'model save epoch point: {save_point+1}')
     
     for epoch in range(saved_model_epoch,total_max_epoch):
-        logger.info(f'---------------------------------------------------------------')
-        logger.info(f'Epoch {epoch + 1}/{total_max_epoch}')                
-        saved_model_epoch = model.epoch.item()
-        logger.info(f'loaded_model_trained_epoch: {saved_model_epoch}')
-            
-        random_seed_num = int(saved_model_epoch) + int(cfg.random_seed)*20
-        torch.manual_seed(random_seed_num)
-        np.random.seed(random_seed_num)
-        random.seed(random_seed_num)
+        saved_model_epoch = base_model.epoch.item()
+        if is_main:
+            logger.info(f'---------------------------------------------------------------')
+            logger.info(f'Epoch {epoch + 1}/{total_max_epoch}')                
+            logger.info(f'loaded_model_trained_epoch: {saved_model_epoch}')
+                        
+        seed = int(cfg.random_seed)*20 + epoch
+        torch.manual_seed(seed); np.random.seed(seed); random.seed(seed)
 
-        train_epoch_loss = trainer.one_epoch_train(cfg, logger, model, trainloader, criterion, optimizer, scheduler)
+        if use_ddp:
+            data_info.set_epoch(epoch= int(epoch))
+        train_epoch_loss = trainer.one_epoch_train(cfg, logger,model, data_info.trainloader, criterion, optimizer)
+        if scheduler:
+            scheduler.step()
+
         
-        model.add_epoch()        
+        base_model.add_epoch()      
         
         train_loss_list.append(train_epoch_loss)
         since1 = time.time()
-        if (epoch+1)%1==0 and (epoch+1) >= save_point: #10 #best_train_loss > train_epoch_loss and (epoch+1)%1==0 and epoch > 20
-            #best_train_loss = train_epoch_loss
-            #torch.save(model.state_dict(), save_dir + save_name)
-            #saved_model_epoch = model.epoch.item()
-            #logger.info(f'saved_model_total_epoch: {saved_model_epoch}')
-            #logger.info(f'The model is saved at train epoch {epoch+1}')
-            #torch.save(model.state_dict(), save_dir + save_name_backup)            
-            #logger.info(f'backup model is saved at train epoch {epoch+1}')            
-            #logger.info(f'One epoch train is finished')
-            #return None
-            a = 1 #dummy code
+        if is_main: 
             try:
-                best_train_loss = train_epoch_loss
-                torch.save(model.state_dict(), save_dir + save_name)
-                saved_model_epoch = model.epoch.item()
+                torch.save(base_model.state_dict(), save_dir + save_name)
+                saved_model_epoch = base_model.epoch.item()
                 logger.info(f'saved_model_total_epoch: {saved_model_epoch}')
                 logger.info(f'The model is saved at train epoch {epoch+1}')
-                if (epoch+1)%1==0 and (epoch+1) >= save_point:
-                    torch.save(model.state_dict(), save_dir + save_name_backup)            
-                    logger.info(f'backup model is saved at train epoch {epoch+1}')            
-                    logger.info(f'One epoch train is finished')
-                #return None
+                torch.save(base_model.state_dict(), save_dir + save_name_backup)            
+                logger.info(f'backup model is saved at train epoch {epoch+1}')            
+                logger.info(f'One epoch train is finished')
             except Exception as ex:
                 logger.info(f'Error occured during model save')
                 logger.info(f'Error info:',ex)
@@ -155,13 +145,12 @@ def train_model(cfg: DictConfig, logger, model, trainloader, criterion, optimize
                     os.remove(save_dir + save_name)
                 except OSError:
                     pass                        
-                best_train_loss = train_epoch_loss
-                torch.save(model.state_dict(), save_dir + save_name)
-                saved_model_epoch = model.epoch.item()
+                torch.save(base_model.state_dict(), save_dir + save_name)
+                saved_model_epoch = base_model.epoch.item()
                 logger.info(f'saved_model_total_epoch: {saved_model_epoch}')
                 logger.info(f'The model is saved at train epoch {epoch+1}')
                 try:                        
-                    torch.save(model.state_dict(), save_dir + save_name_backup)            
+                    torch.save(base_model.state_dict(), save_dir + save_name_backup)            
                     logger.info(f'backup model is saved at train epoch {epoch+1}')            
                     logger.info(f'One epoch train is finished')
                 except:
@@ -169,22 +158,22 @@ def train_model(cfg: DictConfig, logger, model, trainloader, criterion, optimize
                         os.remove(save_dir + save_name_backup)
                     except OSError:
                         pass
-                    torch.save(model.state_dict(), save_dir + save_name_backup)            
+                    torch.save(base_model.state_dict(), save_dir + save_name_backup)            
                     logger.info(f'backup model is saved at train epoch {epoch+1}')            
                     logger.info(f'One epoch train is finished')
-                #return None
             time_elapsed = time.time() - since1
             logger.info(f'Model save complete in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
             
 
            
         
-    total_loss_info_list.append(train_loss_list)
-    save_loss_plot(total_loss_info_list,cfg, logger)
-    
-    logger.info(f'---------------------------------------------------------------')
-    time_elapsed = time.time() - since
-    logger.info(f'Training complete in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
+    if is_main:    
+        total_loss_info_list.append(train_loss_list)
+        save_loss_plot(total_loss_info_list,cfg, logger)
+        time_elapsed = time.time() - since    
+        logger.info(f'---------------------------------------------------------------')
+        logger.info(f'Training complete in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
+
 
     return None
 
@@ -192,28 +181,36 @@ def train_model(cfg: DictConfig, logger, model, trainloader, criterion, optimize
 class Trainer():
 
     def __init__(self,cfg: DictConfig):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        use_ddp = "LOCAL_RANK" in os.environ  # torchrun sets this
+        if use_ddp:
+            local_rank = int(os.environ["LOCAL_RANK"])
+            device = torch.device(f"cuda:{local_rank}")
+        else:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.use_ddp = use_ddp
         self.device = device
         self.task = cfg.task_name
 
-    def one_epoch_train(self,cfg, logger, model, trainloader, criterion, optimizer,scheduler):
+    def one_epoch_train(self,cfg, logger, model, trainloader, criterion, optimizer):
         train_epoch_loss = 0
         if self.task == "ImageTransmission":
-            train_epoch_loss = self.train_IT_task(cfg, logger, model, trainloader, criterion,optimizer,scheduler)
+            train_epoch_loss = self.train_IT_task(cfg, logger, model, trainloader, criterion,optimizer)
         elif self.task == "ITrandomSNR":
-            train_epoch_loss = self.train_ITrandomSNR_task(cfg, logger, model, trainloader, criterion,optimizer,scheduler)
+            train_epoch_loss = self.train_ITrandomSNR_task(cfg, logger, model, trainloader, criterion,optimizer)
         elif self.task == "FAIT":
-            train_epoch_loss = self.train_FAIT_task(cfg, logger, model, trainloader, criterion,optimizer,scheduler)
+            train_epoch_loss = self.train_FAIT_task(cfg, logger, model, trainloader, criterion,optimizer)
         elif self.task == "FAITrandomSNR":
-            train_epoch_loss = self.train_FAITrandomSNR_task(cfg, logger, model, trainloader, criterion,optimizer,scheduler)
+            train_epoch_loss = self.train_FAITrandomSNR_task(cfg, logger, model, trainloader, criterion,optimizer)
         else:
             raise ValueError(f'{self.task} task train is not implemented yet')
         return train_epoch_loss
     
 
         
-    def train_IT_task(self,cfg: DictConfig, logger, model, trainloader, criterion, optimizer, scheduler):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    def train_IT_task(self,cfg: DictConfig, logger, model, trainloader, criterion, optimizer):
+        use_ddp = self.use_ddp 
+        is_main = (not use_ddp) or (dist.get_rank() == 0)
+        device = self.device
         since = time.time()
 
         model.train()
@@ -248,29 +245,29 @@ class Trainer():
 
             train_epoch_total_loss += total_loss.item() * images.size(0)
             train_epoch_performance += performance.item() * images.size(0)
+            
+            if is_main and count%1000==0:
+                logger.info(f'current count: {count}')
 
-
-        if scheduler is not None:
-            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                scheduler.step(train_epoch_total_loss)
-            else:
-                scheduler.step()
                 
         train_epoch_total_loss = train_epoch_total_loss / count
         train_epoch_performance = train_epoch_performance / count
         avg_ms_per_image = (total_forward_time / count) * 1000.0
-                
-        logger.info(f'train count per epoch: {count}')
-        logger.info(f'Train loss: {train_epoch_total_loss}')
-        logger.info(f'{performance_metric}: {train_epoch_performance}')
-        logger.info(f'Forward time: {avg_ms_per_image:.4f} ms/image')
-        time_elapsed = time.time() - since
-        logger.info(f'Training epoch complete in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
+        
+        if is_main: 
+            logger.info(f'train count per epoch: {count}')
+            logger.info(f'Train loss: {train_epoch_total_loss}')
+            logger.info(f'{performance_metric}: {train_epoch_performance}')
+            logger.info(f'Forward time: {avg_ms_per_image:.4f} ms/image')
+            time_elapsed = time.time() - since
+            logger.info(f'Training epoch complete in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
 
         return train_epoch_total_loss        
 
-    def train_ITrandomSNR_task(self,cfg: DictConfig, logger, model, trainloader, criterion, optimizer, scheduler):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    def train_ITrandomSNR_task(self,cfg: DictConfig, logger, model, trainloader, criterion, optimizer):
+        use_ddp = self.use_ddp 
+        is_main = (not use_ddp) or (dist.get_rank() == 0)
+        device = self.device
         since = time.time()
 
         model.train()
@@ -307,30 +304,28 @@ class Trainer():
 
             train_epoch_total_loss += total_loss.item() * images.size(0)
             train_epoch_performance += performance.item() * images.size(0)
-
-
-        if scheduler is not None:
-            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                scheduler.step(train_epoch_total_loss)
-            else:
-                scheduler.step()
+            if is_main and count%1000==0:
+                logger.info(f'current count: {count}')
                 
         train_epoch_total_loss = train_epoch_total_loss / count
         train_epoch_performance = train_epoch_performance / count
         avg_ms_per_image = (total_forward_time / count) * 1000.0
-                
-        logger.info(f'train count per epoch: {count}')
-        logger.info(f'Train loss: {train_epoch_total_loss}')
-        logger.info(f'{performance_metric}: {train_epoch_performance}')
-        logger.info(f'Forward time: {avg_ms_per_image:.4f} ms/image')
-        time_elapsed = time.time() - since
-        logger.info(f'Training epoch complete in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
+
+        if is_main:                 
+            logger.info(f'train count per epoch: {count}')
+            logger.info(f'Train loss: {train_epoch_total_loss}')
+            logger.info(f'{performance_metric}: {train_epoch_performance}')
+            logger.info(f'Forward time: {avg_ms_per_image:.4f} ms/image')
+            time_elapsed = time.time() - since
+            logger.info(f'Training epoch complete in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
 
         return train_epoch_total_loss        
 
 
-    def train_FAIT_task(self,cfg: DictConfig, logger, model, trainloader, criterion, optimizer, scheduler):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    def train_FAIT_task(self,cfg: DictConfig, logger, model, trainloader, criterion, optimizer):
+        use_ddp = self.use_ddp 
+        is_main = (not use_ddp) or (dist.get_rank() == 0)
+        device = self.device
         since = time.time()
 
         model.train()
@@ -365,29 +360,27 @@ class Trainer():
 
             train_epoch_total_loss += total_loss.item() * images.size(0)
             train_epoch_performance += performance.item() * images.size(0)
+            if is_main and count%1000==0:
+                logger.info(f'current count: {count}')
 
-
-        if scheduler is not None:
-            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                scheduler.step(train_epoch_total_loss)
-            else:
-                scheduler.step()
-                
         train_epoch_total_loss = train_epoch_total_loss / count
         train_epoch_performance = train_epoch_performance / count
         avg_ms_per_image = (total_forward_time / count) * 1000.0
-                
-        logger.info(f'train count per epoch: {count}')
-        logger.info(f'Train loss: {train_epoch_total_loss}')
-        logger.info(f'{performance_metric}: {train_epoch_performance}')
-        logger.info(f'Forward time: {avg_ms_per_image:.4f} ms/image')
-        time_elapsed = time.time() - since
-        logger.info(f'Training epoch complete in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
+
+        if is_main:                 
+            logger.info(f'train count per epoch: {count}')
+            logger.info(f'Train loss: {train_epoch_total_loss}')
+            logger.info(f'{performance_metric}: {train_epoch_performance}')
+            logger.info(f'Forward time: {avg_ms_per_image:.4f} ms/image')
+            time_elapsed = time.time() - since
+            logger.info(f'Training epoch complete in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
 
         return train_epoch_total_loss        
 
-    def train_FAITrandomSNR_task(self,cfg: DictConfig, logger, model, trainloader, criterion, optimizer, scheduler):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    def train_FAITrandomSNR_task(self,cfg: DictConfig, logger, model, trainloader, criterion, optimizer):
+        use_ddp = self.use_ddp 
+        is_main = (not use_ddp) or (dist.get_rank() == 0)
+        device = self.device
         since = time.time()
 
         model.train()
@@ -425,23 +418,20 @@ class Trainer():
 
             train_epoch_total_loss += total_loss.item() * images.size(0)
             train_epoch_performance += performance.item() * images.size(0)
-
-        if scheduler is not None:
-            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                scheduler.step(train_epoch_total_loss)
-            else:
-                scheduler.step()
-                
+            if is_main and count%1000==0:
+                logger.info(f'current count: {count}')
+                                
         train_epoch_total_loss = train_epoch_total_loss / count
         train_epoch_performance = train_epoch_performance / count
         avg_ms_per_image = (total_forward_time / count) * 1000.0
-        
-        logger.info(f'train count per epoch: {count}')
-        logger.info(f'Train loss: {train_epoch_total_loss}')
-        logger.info(f'{performance_metric}: {train_epoch_performance}')
-        logger.info(f'Forward time: {avg_ms_per_image:.4f} ms/image')
-        time_elapsed = time.time() - since
-        logger.info(f'Training epoch complete in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
+
+        if is_main:         
+            logger.info(f'train count per epoch: {count}')
+            logger.info(f'Train loss: {train_epoch_total_loss}')
+            logger.info(f'{performance_metric}: {train_epoch_performance}')
+            logger.info(f'Forward time: {avg_ms_per_image:.4f} ms/image')
+            time_elapsed = time.time() - since
+            logger.info(f'Training epoch complete in {time_elapsed // 60:.0f}m { time_elapsed % 60:.0f}s')
 
         return train_epoch_total_loss        
 

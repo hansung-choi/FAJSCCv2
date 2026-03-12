@@ -32,9 +32,7 @@ def main(cfg: DictConfig):
 
 
     # make criterion
-    model.d = 4
-    d = model.d
-    criterion = LossMaker(cfg,d)
+    criterion = LossMaker(cfg)
 
     saved_model_epoch = 0
 
@@ -50,11 +48,11 @@ def main(cfg: DictConfig):
         model_name = cfg.model_name
         save_dir = "../../saved_models/" #"../../../saved_models/"
         
-        save_name = f"{task}_{data}_{chan_type}_SNR{str(SNR).zfill(3)}_rcpp{rcpp}_{metric}_{model_name}.pt"
-        save_name_backup = f"{task}_{data}_{chan_type}_SNR{str(SNR).zfill(3)}_rcpp{rcpp}_{metric}_{model_name}_backup.pt"
-        if model_name == "smallFAJSCCwSA" or model_name == "baseFAJSCCwSA":
-            save_name = f"{task}_{data}_{chan_type}_rcpp{rcpp}_{metric}_{model_name}.pt"
-            save_name_backup = f"{task}_{data}_{chan_type}_rcpp{rcpp}_{metric}_{model_name}_backup.pt"
+        save_name = f"{random_num}_{task}_{data}_{chan_type}_SNR{str(SNR).zfill(3)}_rcpp{rcpp}_{metric}_{model_name}.pt"
+        save_name_backup = f"{random_num}_{task}_{data}_{chan_type}_SNR{str(SNR).zfill(3)}_rcpp{rcpp}_{metric}_{model_name}_backup.pt"
+        if model_name in ["ConvJSCCrandomSNR","ResJSCCrandomSNR","SwinJSCCrandomSNR","LICRFJSCCrandomSNR","LAJSCCrandomSNR","FAJSCCrandomSNR"]:
+            save_name = f"{random_num}_{task}_{data}_{chan_type}_rcpp{rcpp}_{metric}_{model_name}.pt"
+            save_name_backup = f"{random_num}_{task}_{data}_{chan_type}_rcpp{rcpp}_{metric}_{model_name}_backup.pt"
             
 
           
@@ -92,8 +90,10 @@ def main(cfg: DictConfig):
                     model = ModelMaker(cfg)   # make model and set appropriate task name
                     
 
-                     
-
+    if metric in ["LPIPS"]:
+        logger.info(f'LPIPS metric, new model is made')
+        model = ModelMaker(cfg)                        
+        saved_model_epoch = model.epoch.item()
 
     if saved_model_epoch >=cfg.total_max_epoch:
         logger.info(f'saved model already exists, total_max_epoch is {cfg.total_max_epoch}')
@@ -108,9 +108,7 @@ def main(cfg: DictConfig):
 
     
     # make criterion
-    model.d = 4
-    d = model.d
-    criterion = LossMaker(cfg,d)
+    criterion = LossMaker(cfg)
     get_task_info(cfg)
     
     
@@ -129,7 +127,7 @@ def main(cfg: DictConfig):
 
 
     # train model
-    train_model(cfg, logger, model, data_info.trainloader, data_info.testloader, criterion, optimizer, scheduler)
+    train_model(cfg, logger, model, data_info.trainloader, criterion, optimizer, scheduler)
 
     task = cfg.task_name
     data = cfg.data_info.data_name

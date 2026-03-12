@@ -18,7 +18,7 @@ def main(cfg: DictConfig):
     logger.info(f'device: {device}')
     
     hydra_cfg = hydra.core.hydra_config.HydraConfig.get()
-
+    cfg.test_data == "DIV2K"
     # set random seed number
     random_seed_num = cfg.random_seed
     torch.manual_seed(random_seed_num)
@@ -26,6 +26,7 @@ def main(cfg: DictConfig):
     random.seed(random_seed_num)
     
     # make data_info
+    cfg.test_data = "DIV2K"
     data_info = DataMaker(cfg)
     
     model_name_list_r12 = ["FAJSCCr12_00","FAJSCCr12_02","FAJSCCr12_04","FAJSCCr12_05","FAJSCCr12_06","FAJSCCr12_08","FAJSCCr12_10"]
@@ -46,6 +47,17 @@ def main(cfg: DictConfig):
     total_model_list = model_name_list_r12 + model_name_list_r1 + model_name_list_r2 + model_name_list3
     
     
+    total_eval_dict_list = get_total_eval_dict_list(cfg,logger,total_model_list,rcpp_list,SNR_list)
+    
+    save_SNR_performance_table_meanstd(cfg, logger, total_eval_dict_list, total_model_list, 12, SNR_list,prefix='Ratio_')
+    
+    save_gflops_memory_table_meanstd(cfg, logger, total_eval_dict_list,total_model_list, 12, 1,prefix='Ratio_')
+    
+    save_GFlops_performance_ratio_plot_meanstd(cfg,logger,total_eval_dict_list,model_name_list_r1,model_name_list_r12,model_name_list_r2,model_name_list3,model_type_list_r1,model_type_list_r12,model_type_list_r2,12,1,postfix="_")
+
+    save_GFlops_performance_ratio_plot_meanstd(cfg,logger,total_eval_dict_list,model_name_list_r1,model_name_list_r12,model_name_list_r2,model_name_list3,model_type_list_r1,model_type_list_r12,model_type_list_r2,12,10,postfix="_")
+    
+    
     total_eval_dict = get_total_eval_dict(cfg,logger,total_model_list,rcpp_list,SNR_list)
     
     
@@ -54,6 +66,8 @@ def main(cfg: DictConfig):
     save_GFlops_performance_ratio_plot(cfg,logger,total_eval_dict,model_name_list_r1,model_name_list_r12,model_name_list_r2,model_name_list3,model_type_list_r1,model_type_list_r12,model_type_list_r2,12,10,postfix="_")    
     
     save_SNR_performance_table(cfg,logger,total_eval_dict,total_model_list,12,SNR_list,prefix="Ratio_")
+    
+    save_gflops_memory_table(cfg,logger,total_eval_dict,total_model_list,rcpp=12,SNR=10,prefix=f'Ratio_')
     
 
     
@@ -74,6 +88,4 @@ if __name__ == '__main__':
 
 
 
-
     
-

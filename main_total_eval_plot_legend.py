@@ -18,7 +18,7 @@ def main(cfg: DictConfig):
     logger.info(f'device: {device}')
     
     hydra_cfg = hydra.core.hydra_config.HydraConfig.get()
-
+    cfg.test_data == "DIV2K"
     model_name_list = ["FAJSCC (ours)","LAJSCC (ours)","LICRFJSCC","SwinJSCC","ResJSCC","ConvJSCC"]
     save_plot_legend_type1(cfg,logger,model_name_list,plot_name='_main_',ncol=6)
     
