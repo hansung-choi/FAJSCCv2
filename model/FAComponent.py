@@ -8,11 +8,11 @@ from einops import rearrange
 
 
 #Codes are implemented based on the next computer vision papers to develop a new deep joint source channel coding system.
-#[1] X. Kong, H. Zhao, Y. Qiao, and C. Dong, ¡°ClassSR: A general framework to accelerate super-resolution networks by data characteristic,¡± 
+#[1] X. Kong, H. Zhao, Y. Qiao, and C. Dong, Â¡Â°ClassSR: A general framework to accelerate super-resolution networks by data characteristic,Â¡Â± 
 #in Proc. IEEE Conf. Comput. Vis. Pattern Recognit., Jun. 2021, pp. 12016-12025.
-#[2] Y. Wang, Y. Liu, S. Zhao, J. Li, and L. Zhang, ¡°CAMixerSR: Only details need more ¡°attention¡±,¡± 
+#[2] Y. Wang, Y. Liu, S. Zhao, J. Li, and L. Zhang, Â¡Â°CAMixerSR: Only details need more Â¡Â°attentionÂ¡Â±,Â¡Â± 
 #in Proc. IEEE Conf. Comput. Vis. Pattern Recognit., Jun. 2024, pp. 25837-25846.
-#[3] S. W. Zamir, A. Arora, S. Khan, M. Hayat, F. S. Khan, and M.-H. Yang, ¡°Restormer: Efficient transformer for high-resolution image restoration,¡±
+#[3] S. W. Zamir, A. Arora, S. Khan, M. Hayat, F. S. Khan, and M.-H. Yang, Â¡Â°Restormer: Efficient transformer for high-resolution image restoration,Â¡Â±
 #in Proc. IEEE Conf. Comput. Vis. Pattern Recognit., Jun. 2022, pp. 5728-5739.
 #The new proposed components are selective feature enhancement, light attention to enhance depthwise operation, attention feature tree, etc. See more details in the main paper.
 
@@ -199,25 +199,6 @@ class AttentionTree(nn.Module):
             nn.Linear(window_size, 2),
             nn.Softmax(dim=-1)
         )
-    def swap_indices_between_sets(self, idx1, idx2):
-        if self.swap <= 0:
-            return idx1, idx2
-
-        if idx1.shape[1] == 0 or idx2.shape[1] == 0:
-            return idx1, idx2
-
-        num_swap = int(min(idx1.shape[1], idx2.shape[1]) * self.swap)
-        if num_swap <= 0:
-            return idx1, idx2
-
-        idx1_new = idx1.clone()
-        idx2_new = idx2.clone()
-
-        # Swap boundary elements for each sample independently
-        idx1_new[:, -num_swap:] = idx2[:, :num_swap]
-        idx2_new[:, :num_swap] = idx1[:, -num_swap:]
-
-        return idx1_new, idx2_new
         
     def forward(self, input_x, mask=None, ratio=0.5, train_mode=False):
         x_root = self.backbone(input_x)
@@ -256,7 +237,6 @@ class AttentionTree(nn.Module):
             idx = torch.argsort(score, dim=1, descending=True)
             idx1 = idx[:, :num_keep_node]
             idx2 = idx[:, num_keep_node:]
-            idx1, idx2 = self.swap_indices_between_sets(idx1, idx2)
             return [idx1, idx2], offsets, ca, sa
 
 #need to implement get_spatial_mask method.
@@ -431,6 +411,7 @@ class FAGroup(nn.Module):
                 x = blk(x,condition_global)
             x = self.body_tail(x) + shortcut
             return x 
+
 
 
 
