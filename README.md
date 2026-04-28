@@ -5,6 +5,7 @@
 
 
 Implementations of main experiments for the paper "Feature Importance-Aware Deep Joint Source-Channel Coding for Computationally Efficient and Adjustable Image Transmission" published in IEEE Internet of Things Journal (https://ieeexplore.ieee.org/abstract/document/11474333). 
+
 This is an enhanced version compared to the previous FAJSCC (version 1 of arXiv) by applying axis dimension-specialized computation, selective deformable self-attention, and attention family tree frameworks detailed in the main paper.
 
 
